@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Global Miles Sweet Spot Finder</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --accent: #38bdf8;
+      --best: #10b981;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: #334155;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body {
+      margin: 0; padding: 20px 16px 48px;
+      background: var(--bg); color: var(--text);
+    }
+    h1 { font-size: 1.4rem; margin: 0 0 4px; }
+    p.sub { color: var(--muted); font-size: 0.85rem; margin: 0 0 18px; }
+    .controls {
+      background: var(--card); padding: 16px; border-radius: 14px;
+      display: flex; flex-direction: column; gap: 12px; margin-bottom: 18px;
+      border: 1px solid var(--border);
+    }
+    label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+    select, input {
+      width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
+      background: #0f172a; color: var(--text); font-size: 0.95rem; margin-top: 4px;
+    }
+    .result-card {
+      background: var(--card); border-radius: 14px; padding: 16px;
+      margin-bottom: 12px; border: 1px solid var(--border);
+    }
+    .result-card.lowest { border: 2px solid var(--best); }
+    .badge {
+      display: inline-block; background: var(--best); color: #052e16;
+      font-size: 0.7rem; font-weight: 800; padding: 3px 8px;
+      border-radius: 99px; margin-bottom: 8px; text-transform: uppercase;
+    }
+    .row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+    .program { font-size: 1.05rem; font-weight: 700; }
+    .points { font-size: 1.2rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
+    .lowest .points { color: var(--best); }
+    .airline { font-size: 0.88rem; color: #cbd5e1; margin-top: 4px; }
+    .note { font-size: 0.8rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    .btn-link {
+      display: inline-block; margin-top: 12px; padding: 8px 12px;
+      background: rgba(56, 189, 248, 0.12); color: var(--accent);
+      text-decoration: none; font-size: 0.82rem; font-weight: 600;
+      border-radius: 8px; border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+  <h1>✈️ Global Award Chart Finder</h1>
+  <p class="sub">Published one-way Saver rates from Singapore (SIN).</p>
+
+  <div class="controls">
+    <div>
+      <label for="route">Destination</label>
+      <select id="route" onchange="render()">
+        <optgroup label="Southeast Asia">
+          <option value="BKK">Bangkok (BKK)</option>
+          <option value="DPS">Bali (DPS)</option>
+          <option value="HAN">Hanoi / Ho Chi Minh (HAN/SGN)</option>
+        </optgroup>
+        <optgroup label="North Asia">
+          <option value="HKG">Hong Kong (HKG)</option>
+          <option value="TPE">Taipei (TPE)</option>
+          <option value="TYO" selected>Tokyo (HND/NRT)</option>
+          <option value="ICN">Seoul (ICN)</option>
+        </optgroup>
+        <optgroup label="Oceania">
+          <option value="SYD">Sydney / Melbourne (SYD/MEL)</option>
+          <option value="AKL">Auckland (AKL)</option>
+        </optgroup>
+        <optgroup label="Europe">
+          <option value="LHR">London (LHR)</option>
+          <option value="CDG">Paris (CDG)</option>
+          <option value="FRA">Frankfurt (FRA)</option>
+        </optgroup>
+        <optgroup label="North America">
+          <option value="SFO">San Francisco / Los Angeles (SFO/LAX)</option>
+          <option value="JFK">New York (JFK/EWR)</option>
+        </optgroup>
+      </select>
+    </div>
+
+    <div>
+      <label for="cabin">Cabin Class</label>
+      <select id="cabin" onchange="render()">
+        <option value="economy">Economy Class</option>
+        <option value="business" selected>Business Class</option>
+        <option value="first">First Class / Suites</option>
+      </select>
+    </div>
+
+    <div>
+      <label for="programFilter">Filter by Loyalty Program</label>
+      <select id="programFilter" onchange="render()">
+        <option value="ALL">All Programs</option>
+        <option value="KrisFlyer">SIA KrisFlyer</option>
+        <option value="Avios">Qatar / BA Avios</option>
+        <option value="Asia Miles">Cathay Asia Miles</option>
+        <option value="ANA">ANA Mileage Club</option>
+        <option value="Aeroplan">Air Canada Aeroplan</option>
+        <option value="Flying Blue">Air France / KLM Flying Blue</option>
+        <option value="LifeMiles">Avianca LifeMiles</option>
+        <option value="EVA">EVA Air Infinity MileageLands</option>
+        <option value="Alaska">Alaska Mileage Plan</option>
+        <option value="Virgin">Virgin Atlantic Flying Club</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="results"></div>
+
+  <script>
+    const links = {
+      "KrisFlyer": "https://www.singaporeair.com/",
+      "Avios": "https://www.qatarairways.com/",
+      "Asia Miles": "https://www.cathaypacific.com/",
+      "ANA": "https://www.ana.co.jp/",
+      "Aeroplan": "https://www.aircanada.com/",
+      "Flying Blue": "https://www.airfrance.com/",
+      "LifeMiles": "https://www.lifemiles.com/",
+      "EVA": "https://www.evaair.com/",
+      "Alaska": "https://www.alaskaair.com/",
+      "Virgin": "https://flywith.virginatlantic.com/"
+    };
+
+    const awardData = {
+      BKK: {
+        economy: [
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Cathay Pacific (via HKG) or Malaysia Airlines", points: 11000, note: "Distance-based partner rate; non-stop only via MH/CX connections." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 13500, note: "Direct non-stop Saver rate; Spontaneous Escapes drops to ~9,450." },
+          { tag: "LifeMiles", program: "Avianca LifeMiles", airline: "Thai Airways / Singapore Airlines", points: 15000, note: "No fuel surcharges; good for direct Thai Airways flights." }
+        ],
+        business: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 24000, note: "Direct non-stop Saver; drops to ~16,800 during monthly promos." },
+          { tag: "LifeMiles", program: "Avianca LifeMiles", airline: "Thai Airways / Singapore Airlines", points: 25000, note: "Low taxes and no fuel surcharges on Thai Airways." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / Thai Airways", points: 25000, note: "No carrier surcharges; easy online booking." }
+        ],
+        first: []
+      },
+      DPS: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 8500, note: "Zone 2 Saver rate; drops to ~5,950 on Spontaneous Escapes." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "KLM (Direct)", points: 10000, note: "KLM operates fifth-freedom direct flights between SIN and DPS." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines", points: 12500, note: "Distance-based rate under 2,000 miles." }
+        ],
+        business: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 21000, note: "Direct non-stop Saver rate; frequent promo discounts." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines", points: 25000, note: "Partner rate when SQ releases regional business inventory." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "KLM (Direct)", points: 29000, note: "Direct KLM B777/B787 lie-flat fifth-freedom flight." }
+        ],
+        first: []
+      },
+      HAN: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 13500, note: "Direct non-stop Saver rate to HAN or SGN." },
+          { tag: "LifeMiles", program: "Avianca LifeMiles", airline: "Singapore Airlines", points: 15000, note: "Useful if transferring from US/partner points." }
+        ],
+        business: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 24000, note: "Direct non-stop Saver rate." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines", points: 25000, note: "Low taxes; easy partner search." }
+        ],
+        first: []
+      },
+      HKG: {
+        economy: [
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific", points: 12500, note: "Distance-based Type 2 standard rate; high direct availability." },
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Cathay Pacific", points: 13000, note: "Partner rate on direct Cathay Pacific flights." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 16500, note: "Direct non-stop Saver rate." }
+        ],
+        business: [
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific", points: 28000, note: "Best direct availability on Cathay Pacific." },
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Cathay Pacific", points: 31000, note: "Bookable via BA or Qatar Avios." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 34000, note: "Direct non-stop Saver rate." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 45000, note: "Available on select B777-300ER flights to HKG." }
+        ]
+      },
+      TPE: {
+        economy: [
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific (via HKG)", points: 12500, note: "Includes a short transit in Hong Kong." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 16500, note: "Direct non-stop Saver rate." },
+          { tag: "EVA", program: "EVA Air Infinity MileageLands", airline: "EVA Air", points: 17500, note: "Direct flight on EVA Air; low fuel surcharges." }
+        ],
+        business: [
+          { tag: "EVA", program: "EVA Air Infinity MileageLands", airline: "EVA Air", points: 25000, note: "Top sweet spot for direct Royal Laurel lie-flat Business Class." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 34000, note: "Direct non-stop Saver rate." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "EVA Air / Singapore Airlines", points: 45000, note: "Distance-based rate; no fuel surcharges." }
+        ],
+        first: []
+      },
+      TYO: {
+        economy: [
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Japan Airlines (JAL)", points: 20000, note: "Distance-based partner chart; great value vs KrisFlyer." },
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Japan Airlines (JAL)", points: 22000, note: "Direct JAL flight to HND or NRT." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 27000, note: "Direct non-stop Saver rate." },
+          { tag: "ANA", program: "ANA Mileage Club", airline: "ANA / Singapore Airlines", points: 35000, note: "Zone-based chart; lower taxes on SQ." }
+        ],
+        business: [
+          { tag: "ANA", program: "ANA Mileage Club", airline: "ANA / Singapore Airlines", points: 43000, note: "One-way redemptions allowed; top Star Alliance sweet spot." },
+          { tag: "Virgin", program: "Virgin Atlantic Flying Club", airline: "ANA (All Nippon Airways)", points: 45000, note: "Distance-based chart; requires phone booking for ANA." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 52000, note: "Direct flights on A350/B777; widest availability." },
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Japan Airlines (JAL)", points: 58000, note: "Direct JAL Sky Suite Business Class." },
+          { tag: "Alaska", program: "Alaska Mileage Plan", airline: "Japan Airlines (JAL)", points: 60000, note: "Allows free stopover in Tokyo if continuing onward." }
+        ],
+        first: [
+          { tag: "ANA", program: "ANA Mileage Club", airline: "ANA (All Nippon Airways)", points: 68000, note: "The Suite First Class on select Tokyo routes." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 77000, note: "Direct SQ First Class on B777-300ER." },
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Japan Airlines (JAL)", points: 85000, note: "Direct JAL First Class to Haneda." }
+        ]
+      },
+      ICN: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 27000, note: "Direct non-stop Saver rate." },
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific (via HKG)", points: 27000, note: "1 stop in Hong Kong." }
+        ],
+        business: [
+          { tag: "ANA", program: "ANA Mileage Club", airline: "Asiana / Singapore Airlines", points: 43000, note: "Lowest Star Alliance rate to North Asia." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 52000, note: "Direct non-stop Saver rate." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Asiana / Singapore Airlines", points: 60000, note: "No carrier fuel surcharges." }
+        ],
+        first: []
+      },
+      SYD: {
+        economy: [
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Qantas", points: 22000, note: "Off-peak partner rate on direct Qantas flights." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 30500, note: "Direct non-stop Saver rate." }
+        ],
+        business: [
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Qantas", points: 62000, note: "Direct Qantas flight using Avios." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines", points: 65000, note: "Great partner rate when SQ releases seats." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 68500, note: "Direct non-stop Saver rate." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 93500, note: "Direct A380 Suites or B777 First Class to Sydney." },
+          { tag: "Avios", program: "British Airways / Qatar Avios", airline: "Qantas", points: 103000, note: "Qantas A380 First Class." }
+        ]
+      },
+      AKL: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines / Air New Zealand", points: 30500, note: "Same zone as Australia in KrisFlyer chart." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Air New Zealand / Singapore Airlines", points: 45000, note: "Distance-based rate." }
+        ],
+        business: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines / Air New Zealand", points: 68500, note: "Top sweet spot; Auckland costs the same as Sydney." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Air New Zealand / Singapore Airlines", points: 80000, note: "No fuel surcharges." }
+        ],
+        first: []
+      },
+      LHR: {
+        economy: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 35000, note: "Off-peak Avios pricing via Doha." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 42000, note: "Direct non-stop Saver rate." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "Air France / KLM (via CDG/AMS)", points: 45000, note: "Dynamic starting price; lower during monthly Promo Rewards." }
+        ],
+        business: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 75000, note: "Qsuite available; 1 stop in Doha." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / Lufthansa / Swiss", points: 87500, note: "Distance-based; low taxes and no surcharges." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "Air France / KLM (via CDG/AMS)", points: 90000, note: "Starting saver rate; drops to ~67,500 on Promo Rewards." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 103500, note: "Direct non-stop flight on A380/B777." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 141000, note: "Direct A380 Suites or B777 First Class to London." }
+        ]
+      },
+      CDG: {
+        economy: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 35000, note: "Off-peak Avios pricing via Doha." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 42000, note: "Direct non-stop Saver rate." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "Air France (Direct)", points: 45000, note: "Direct non-stop on Air France; watch for 25% off Promo Rewards." }
+        ],
+        business: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 75000, note: "Qsuite via Doha." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / Swiss / Lufthansa", points: 87500, note: "No carrier fuel surcharges." },
+          { tag: "Flying Blue", program: "Air France / KLM Flying Blue", airline: "Air France (Direct)", points: 90000, note: "Direct flight to Paris; drops to ~67,500 during promos." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 103500, note: "Direct non-stop Saver rate." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 141000, note: "Direct SQ First Class to Paris." }
+        ]
+      },
+      FRA: {
+        economy: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 35000, note: "1 stop in Doha." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 42000, note: "Direct non-stop Saver rate." }
+        ],
+        business: [
+          { tag: "Avios", program: "Qatar Privilege Club (Avios)", airline: "Qatar Airways (via DOH)", points: 75000, note: "Qsuite via Doha." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / Lufthansa", points: 87500, note: "Distance-based sweet spot; avoids Lufthansa surcharges." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 103500, note: "Direct non-stop Saver rate." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 141000, note: "Direct A380 Suites or B777 First Class." }
+        ]
+      },
+      SFO: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 44000, note: "Direct ultra-long-haul Saver rate." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "United / Singapore Airlines", points: 50000, note: "Includes onward US connections." }
+        ],
+        business: [
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / United / EVA Air", points: 87500, note: "Best Star Alliance rate to US West Coast." },
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 107000, note: "Direct non-stop flight; best seat inventory." },
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific (via HKG)", points: 110000, note: "1 stop in Hong Kong." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 148000, note: "Direct SQ First Class on B777-300ER (via HKG or NRT)." }
+        ]
+      },
+      JFK: {
+        economy: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 44000, note: "World's longest non-stop flight (SIN-JFK/EWR)." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / United", points: 60000, note: "Distance-based tier for over 7,500 miles." }
+        ],
+        business: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 111500, note: "Direct non-stop ultra-long-haul Saver rate." },
+          { tag: "Aeroplan", program: "Air Canada Aeroplan", airline: "Singapore Airlines / EVA Air", points: 115000, note: "Distance-based rate for flights over 7,500 miles." },
+          { tag: "Asia Miles", program: "Cathay Asia Miles", airline: "Cathay Pacific (via HKG)", points: 115000, note: "1 stop in Hong Kong." }
+        ],
+        first: [
+          { tag: "KrisFlyer", program: "SIA KrisFlyer", airline: "Singapore Airlines", points: 156500, note: "SQ Suites / First Class on SIN-FRA-JFK route." }
+        ]
+      }
+    };
+
+    function render() {
+      const route = document.getElementById("route").value;
+      const cabin = document.getElementById("cabin").value;
+      const filter = document.getElementById("programFilter").value;
+      const container = document.getElementById("results");
+
+      let options = awardData[route][cabin] || [];
+
+      if (filter !== "ALL") {
+        options = options.filter(item => item.tag === filter);
+      }
+
+      if (options.length === 0) {
+        container.innerHTML = `<div class="empty">No published Saver data for this cabin/filter combination. Try switching to Business or Economy.</div>`;
+        return;
+      }
+
+      // Sort lowest points first
+      options = [...options].sort((a, b) => a.points - b.points);
+
+      container.innerHTML = options.map((item, idx) => `
+        <div class="result-card ${idx === 0 ? 'lowest' : ''}">
+          ${idx === 0 ? '<span class="badge">Lowest Points</span>' : ''}
+          <div class="row-top">
+            <span class="program">${item.program}</span>
+            <span class="points">${item.points.toLocaleString()} pts</span>
+          </div>
+          <div class="airline">Operating Airline: <strong>${item.airline}</strong></div>
+          <div class="note">${item.note}</div>
+          <a class="btn-link" href="${links[item.tag]}" target="_blank" rel="noopener">Check ${item.tag} Availability ↗</a>
+        </div>
+      `).join("");
+    }
+
+    render();
+  </script>
+</body>
+</html>
